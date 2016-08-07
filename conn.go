@@ -1,4 +1,4 @@
-package msgRedis
+package redis
 
 import (
 	"bufio"
@@ -42,6 +42,13 @@ var (
 
 	CommonErrPrefix = "CommonError:"
 )
+
+type connDriver struct {
+	*conn
+	readTimeout  time.Duration
+	writeTimeout time.Duration
+	pool         *Pool
+}
 
 //
 type Conn struct {

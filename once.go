@@ -1,4 +1,3 @@
-package msgRedis
 
 import (
 	"errors"
