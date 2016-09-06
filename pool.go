@@ -1,239 +1,19 @@
-package msgRedis
+package redis
 
 import (
-	"encoding/json"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
 
 var debug = true
 
-const (
-	DefaultMaxConnNumber     = 100
-	DefaultMaxIdleNumber     = 25
-	DefaultMaxIdleSeconds    = 28
-	DefaultMaxConnsWaitTimes = 50
-)
-
-// include multi redis server's connection pool
-type MultiPool struct {
-	pools   map[string]*Pool
-	servers []string
-
-	maxConnNum     int
-	maxIdleNum     int
-	maxIdleSeconds int64
-
-	mu sync.RWMutex
-}
-
-//
-func NewMultiPool(addresses []string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) *MultiPool {
-	mp := &MultiPool{
-		pools:          make(map[string]*Pool, len(addresses)),
-		servers:        make([]string, len(addresses)),
-		maxConnNum:     maxConnNum,
-		maxIdleNum:     maxIdleNum,
-		maxIdleSeconds: maxIdleSeconds,
-	}
-
-	for _, addr := range addresses {
-		mp.AddPool(addr)
-	}
-
-	return mp
-}
-
-func (mp *MultiPool) AddPool(address string) (*Pool, bool) {
-	mp.mu.Lock()
-	defer mp.mu.Unlock()
-
-	pool, ok := mp.pools[address]
-	if ok {
-		return pool, true
-	}
-
-	addrPass := strings.Split(address, ":")
-	if len(addrPass) == 3 {
-		// redis need auth
-		pool = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], mp.maxConnNum, mp.maxIdleNum, mp.maxIdleSeconds)
-	} else if len(addrPass) == 2 {
-		// redis do not need auth
-		pool = NewPool(address, "", mp.maxConnNum, mp.maxIdleNum, mp.maxIdleSeconds)
-	} else {
-		Debug("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123", address)
-		return nil, false
-	}
-
-	mp.pools[address] = pool
-	mp.servers = append(mp.servers, address)
-
-	return pool, true
-}
-
-func (mp *MultiPool) DelPool(address string) {
-	mp.mu.Lock()
-	delete(mp.pools, address)
-	delIndex := -1
-	for index, addr := range mp.servers {
-		if addr == address {
-			delIndex = index
-			break
-		}
-	}
-	if delIndex != -1 {
-		mp.servers = append(mp.servers[:delIndex], mp.servers[delIndex+1:]...)
-	}
-	mp.mu.Unlock()
-}
-
-func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) bool {
-	mp.mu.Lock()
-	_, ok := mp.pools[src]
-	delete(mp.pools, src)
-	mp.mu.Unlock()
-	if !ok {
-		Debug("src not exists in the pool", src)
-		return false
-	}
-
-	addrPass := strings.Split(dst, ":")
-	if len(addrPass) == 3 {
-		// redis need auth
-		mp.mu.Lock()
-		mp.pools[dst] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleNum, maxIdleSeconds)
-		mp.mu.Unlock()
-	} else if len(addrPass) == 2 {
-		// redis do not need auth
-		mp.mu.Lock()
-		mp.pools[dst] = NewPool(dst, "", maxConnNum, maxIdleNum, maxIdleSeconds)
-		mp.mu.Unlock()
-	} else {
-		Debug("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123", dst)
-		return false
-	}
-	mp.mu.Lock()
-	for _, server := range mp.servers {
-		if server == src {
-			server = dst
-		}
-	}
-	mp.mu.Unlock()
-	return true
-}
-
-// get conn by address directly
-func (mp *MultiPool) PopByAddr(addr string) *Conn {
-	mp.mu.RLock()
-	pool, ok := mp.pools[addr]
-	mp.mu.RUnlock()
-	if ok {
-		return pool.Pop()
-	}
-	pool, ok = mp.AddPool(addr)
-	if !ok {
-		Debug("[PopByAddr] invalid", addr)
-		return nil
-	}
-	return pool.Pop()
-}
-
-func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
-	mp.mu.RLock()
-	pool, ok := mp.pools[addr]
-	mp.mu.RUnlock()
-	if !ok {
-		Debug("[PushByAddr] invalid", addr)
-		return
-	}
-	pool.Push(c)
-}
-
-// sum(key)/len(pools)
-func (mp *MultiPool) PopByKey(key string) *Conn {
-	mp.mu.RLock()
-	addr := mp.servers[Sum(key)%len(mp.pools)]
-	pool, ok := mp.pools[addr]
-	mp.mu.RUnlock()
-
-	if !ok {
-		Debug("[PopByKey] invalid", addr)
-		return nil
-	}
-	return pool.Pop()
-}
-
-func (mp *MultiPool) PushByKey(key string, c *Conn) {
-	mp.mu.RLock()
-	addr := mp.servers[Sum(key)%len(mp.pools)]
-	pool, ok := mp.pools[addr]
-	mp.mu.RUnlock()
-	if !ok {
-		Debug("[PushByKey] invalid", addr)
-		return
-	}
-	pool.Push(c)
-}
-
-func (mp *MultiPool) Push(c *Conn) {
-	if c == nil {
-		return
-	}
-	addr := c.Address
-	mp.mu.RLock()
-	pool, ok := mp.pools[addr]
-	mp.mu.RUnlock()
-	if !ok {
-		Debug("[Push] invalid", addr)
-		return
-	}
-	pool.Push(c)
-}
-
-func (mp *MultiPool) Info() string {
-	var jsonLock sync.Mutex
-	var wait sync.WaitGroup
-	mp.mu.RLock()
-	jsonSlice := make([]*PoolInfo, 0, len(mp.pools))
-	for _, p := range mp.pools {
-		wait.Add(1)
-		go func(p *Pool) {
-			info := p.Info()
-			jsonLock.Lock()
-			jsonSlice = append(jsonSlice, info)
-			jsonLock.Unlock()
-			wait.Done()
-		}(p)
-	}
-	mp.mu.RUnlock()
-	wait.Wait()
-
-	responseJson, _ := json.Marshal(jsonSlice)
-	return string(responseJson)
-}
-
-func (mp *MultiPool) ClearInfo() {
-	var wait sync.WaitGroup
-	mp.mu.RLock()
-	for _, p := range mp.pools {
-		wait.Add(1)
-		go func(p *Pool) {
-			p.ClearInfo()
-			wait.Done()
-		}(p)
-	}
-	mp.mu.RUnlock()
-	wait.Wait()
-}
-
-// connection pool of only one redis server
+// connection pool of one redis server
 type Pool struct {
 	Address  string
 	Password string
-
-	// 统计信息
+	// @todo add to independent monitor struct
+	// stat for monitor
 	IdleNum         int
 	ActiveNum       int
 	MaxConnNum      int
@@ -244,17 +24,15 @@ type Pool struct {
 	PingErrNum      int
 	CallNetErrNum   int
 
-	MaxIdleSeconds int64
-
 	ClientPool chan *Conn
 	mu         sync.RWMutex
 
 	CallNum int64
 	callMu  sync.RWMutex
 
-	ScriptMap map[string]string
-
-	CallConsume map[string]int // 命令消耗时长
+	ScriptMap   map[string]string
+	CallConsume map[string]int // time consume
+	cd          *ConnDriver    // ConnDriver contain this pool
 }
 
 func NewPool(address, password string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) *Pool {
@@ -546,3 +324,210 @@ func Debug(info, address string) {
 		println(Now() + info + "|addr=" + address)
 	}
 }
+
+/*
+// include multi redis server's connection pool
+type MultiPool struct {
+	pools   map[string]*Pool
+	servers []string
+	mu      sync.RWMutex
+}
+
+//
+func NewMultiPool(addresses []string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) *MultiPool {
+	mp := &MultiPool{
+		pools:          make(map[string]*Pool, len(addresses)),
+		servers:        make([]string, len(addresses)),
+		maxConnNum:     maxConnNum,
+		maxIdleNum:     maxIdleNum,
+		maxIdleSeconds: maxIdleSeconds,
+	}
+
+	for _, addr := range addresses {
+		mp.AddPool(addr)
+	}
+
+	return mp
+}
+
+func (mp *MultiPool) AddPool(address string) (*Pool, bool) {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+	pool, ok := mp.pools[address]
+	if ok {
+		return pool, true
+	}
+
+	addrPass := strings.Split(address, ":")
+	if len(addrPass) == 3 {
+		// redis need auth
+		pool = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], mp.maxConnNum, mp.maxIdleNum, mp.maxIdleSeconds)
+	} else if len(addrPass) == 2 {
+		// redis do not need auth
+		pool = NewPool(address, "", mp.maxConnNum, mp.maxIdleNum, mp.maxIdleSeconds)
+	} else {
+		Debug("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123", address)
+		return nil, false
+	}
+
+	mp.pools[address] = pool
+	mp.servers = append(mp.servers, address)
+
+	return pool, true
+}
+
+func (mp *MultiPool) DelPool(address string) {
+	mp.mu.Lock()
+	delete(mp.pools, address)
+	delIndex := -1
+	for index, addr := range mp.servers {
+		if addr == address {
+			delIndex = index
+			break
+		}
+	}
+	if delIndex != -1 {
+		mp.servers = append(mp.servers[:delIndex], mp.servers[delIndex+1:]...)
+	}
+	mp.mu.Unlock()
+}
+
+func (mp *MultiPool) ReplacePool(src, dst string, maxConnNum, maxIdleNum int, maxIdleSeconds int64) bool {
+	mp.mu.Lock()
+	_, ok := mp.pools[src]
+	delete(mp.pools, src)
+	mp.mu.Unlock()
+	if !ok {
+		Debug("src not exists in the pool", src)
+		return false
+	}
+
+	addrPass := strings.Split(dst, ":")
+	if len(addrPass) == 3 {
+		// redis need auth
+		mp.mu.Lock()
+		mp.pools[dst] = NewPool(addrPass[0]+":"+addrPass[1], addrPass[2], maxConnNum, maxIdleNum, maxIdleSeconds)
+		mp.mu.Unlock()
+	} else if len(addrPass) == 2 {
+		// redis do not need auth
+		mp.mu.Lock()
+		mp.pools[dst] = NewPool(dst, "", maxConnNum, maxIdleNum, maxIdleSeconds)
+		mp.mu.Unlock()
+	} else {
+		Debug("invalid address format:should 1.1.1.1:1100 or 1.1.1.1:1100:123", dst)
+		return false
+	}
+	mp.mu.Lock()
+	for _, server := range mp.servers {
+		if server == src {
+			server = dst
+		}
+	}
+	mp.mu.Unlock()
+	return true
+}
+
+// get conn by address directly
+func (mp *MultiPool) PopByAddr(addr string) *Conn {
+	mp.mu.RLock()
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if ok {
+		return pool.Pop()
+	}
+	pool, ok = mp.AddPool(addr)
+	if !ok {
+		Debug("[PopByAddr] invalid", addr)
+		return nil
+	}
+	return pool.Pop()
+}
+
+func (mp *MultiPool) PushByAddr(addr string, c *Conn) {
+	mp.mu.RLock()
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if !ok {
+		Debug("[PushByAddr] invalid", addr)
+		return
+	}
+	pool.Push(c)
+}
+
+// sum(key)/len(pools)
+func (mp *MultiPool) PopByKey(key string) *Conn {
+	mp.mu.RLock()
+	addr := mp.servers[Sum(key)%len(mp.pools)]
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+
+	if !ok {
+		Debug("[PopByKey] invalid", addr)
+		return nil
+	}
+	return pool.Pop()
+}
+
+func (mp *MultiPool) PushByKey(key string, c *Conn) {
+	mp.mu.RLock()
+	addr := mp.servers[Sum(key)%len(mp.pools)]
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if !ok {
+		Debug("[PushByKey] invalid", addr)
+		return
+	}
+	pool.Push(c)
+}
+
+func (mp *MultiPool) Push(c *Conn) {
+	if c == nil {
+		return
+	}
+	addr := c.Address
+	mp.mu.RLock()
+	pool, ok := mp.pools[addr]
+	mp.mu.RUnlock()
+	if !ok {
+		Debug("[Push] invalid", addr)
+		return
+	}
+	pool.Push(c)
+}
+
+func (mp *MultiPool) Info() string {
+	var jsonLock sync.Mutex
+	var wait sync.WaitGroup
+	mp.mu.RLock()
+	jsonSlice := make([]*PoolInfo, 0, len(mp.pools))
+	for _, p := range mp.pools {
+		wait.Add(1)
+		go func(p *Pool) {
+			info := p.Info()
+			jsonLock.Lock()
+			jsonSlice = append(jsonSlice, info)
+			jsonLock.Unlock()
+			wait.Done()
+		}(p)
+	}
+	mp.mu.RUnlock()
+	wait.Wait()
+
+	responseJson, _ := json.Marshal(jsonSlice)
+	return string(responseJson)
+}
+
+func (mp *MultiPool) ClearInfo() {
+	var wait sync.WaitGroup
+	mp.mu.RLock()
+	for _, p := range mp.pools {
+		wait.Add(1)
+		go func(p *Pool) {
+			p.ClearInfo()
+			wait.Done()
+		}(p)
+	}
+	mp.mu.RUnlock()
+	wait.Wait()
+}
+*/

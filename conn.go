@@ -43,18 +43,49 @@ var (
 	CommonErrPrefix = "CommonError:"
 )
 
-type connDriver struct {
-	*conn
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-	pool         *Pool
+var UseSlaveCommand = map[string]struct{}{
+	"GET":    struct{}{},
+	"LRANGE": struct{}{},
 }
 
-//
+// ConnDriver contains the master and slave connection pool
+type ConnDriver struct {
+	client      *Client
+	address     *Address
+	mp          *Pool   // master pool
+	sp          []*Pool // salve pool
+	currentConn *Conn   // current Conn pop from the mp or sp
+	callOnce    bool    // call once and recycle this drvier
+}
+
+// New ConnDriver for Client
+func NewConnDriver(client *Client, address *Address) *ConnDriver {
+	cd := &ConnDriver{
+		client:  client,
+		address: address,
+	}
+	cd.mp = NewPool(
+		address.addr,
+		address.password,
+		client.option.maxConnPerServer,
+		client.option.maxIdleConnPerServer,
+		client.option.maxIdleSecondsPerServer,
+	)
+	return cd
+}
+
+// conn Driver use master or slave to send the command
+func (cd *ConnDriver) CallN(retry int, command string, args ...interface{}) (interface{}, error) {
+	if _, ok := UseSlaveCommand[command]; ok {
+		return cd.sp[0].Pop().callN(retry, command, args)
+	}
+	return cd.mp.Pop().callN(retry, command, args)
+}
+
+// connections with read/write buf
 type Conn struct {
 	sync.RWMutex
 	Address        string
-	keepAlive      bool
 	isIdle         bool
 	pipeCount      int
 	lastActiveTime int64
@@ -62,27 +93,19 @@ type Conn struct {
 	conn           *net.TCPConn
 	rb             *bufio.Reader
 	wb             *bufio.Writer
-	readTimeout    time.Duration
-	writeTimeout   time.Duration
-	pool           *Pool
 	err            error // 表示该条链接是否已经出错
-	isOnce         bool  // 用于判断每次调用后，是否自动放回连接池 ，true自动放回无需开发者显示操作，默认为false
+	pool           *Pool
 }
 
 func NewConn(conn *net.TCPConn, connectTimeout, readTimeout, writeTimeout time.Duration, keepAlive bool, pool *Pool, Address string) *Conn {
 	return &Conn{
 		conn:           conn,
 		lastActiveTime: time.Now().Unix(),
-		keepAlive:      keepAlive,
 		isIdle:         true,
 		buffer:         make([]byte, DefaultBufferSize),
 		rb:             bufio.NewReader(conn),
 		wb:             bufio.NewWriter(conn),
-		readTimeout:    readTimeout,
-		writeTimeout:   writeTimeout,
-		pool:           pool,
 		Address:        Address,
-		isOnce:         false,
 	}
 }
 
@@ -123,6 +146,7 @@ func Dial(address, password string, connectTimeout, readTimeout, writeTimeout ti
 	return conn, nil
 }
 
+/*
 func (c *Conn) Copy(conn *Conn) {
 	c.Address = conn.Address
 	c.keepAlive = conn.keepAlive
@@ -139,6 +163,7 @@ func (c *Conn) Copy(conn *Conn) {
 	c.isIdle = conn.isIdle
 	c.err = nil
 }
+*/
 
 func (c *Conn) Close() {
 	if c.conn != nil {
@@ -146,7 +171,7 @@ func (c *Conn) Close() {
 	}
 }
 
-func (c *Conn) CallN(retry int, command string, args ...interface{}) (interface{}, error) {
+func (c *Conn) callN(retry int, command string, args ...interface{}) (interface{}, error) {
 	if c.err != nil {
 		return nil, c.err
 	}

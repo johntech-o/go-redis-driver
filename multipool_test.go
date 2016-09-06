@@ -1,4 +1,4 @@
-package msgRedis
+package redis
 
 import (
 	"fmt"

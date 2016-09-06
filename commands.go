@@ -1,4 +1,4 @@
-package msgRedis
+package redis
 
 // all return integer is int64
 import (
@@ -8,7 +8,7 @@ import (
 )
 
 /******************* connections *******************/
-func (c *Conn) AUTH(password string) (bool, error) {
+func (c *ConnDriver) AUTH(password string) (bool, error) {
 	v, e := c.Call("AUTH", password)
 	if e != nil {
 		Debug("AUTH failed:"+e.Error(), c.Address)
@@ -26,11 +26,11 @@ func (c *Conn) AUTH(password string) (bool, error) {
 	return false, errors.New("invaild response string:" + string(r))
 }
 
-func (c *Conn) QUIT() {
+func (c *ConnDriver) QUIT() {
 
 }
 
-func (c *Conn) IsAlive() bool {
+func (c *ConnDriver) IsAlive() bool {
 	// v, e := c.CallN(RetryTimes, "PING")
 	v, e := c.Call("PING")
 	if e != nil {
@@ -46,7 +46,7 @@ func (c *Conn) IsAlive() bool {
 	return false
 }
 
-func (c *Conn) Info() ([]byte, error) {
+func (c *ConnDriver) Info() ([]byte, error) {
 	v, e := c.Call("INFO")
 	if e != nil {
 		return nil, e
@@ -58,8 +58,7 @@ func (c *Conn) Info() ([]byte, error) {
 	return r, nil
 }
 
-/******************* keys commands *******************/
-func (c *Conn) DEL(key string) (int64, error) {
+func (c *ConnDriver) DEL(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "DEL", key)
 	if e != nil {
 		return -1, e
@@ -70,7 +69,7 @@ func (c *Conn) DEL(key string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) DELMulti(keys []string) (int64, error) {
+func (c *ConnDriver) DELMulti(keys []string) (int64, error) {
 	args := make([]interface{}, len(keys))
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
@@ -85,7 +84,7 @@ func (c *Conn) DELMulti(keys []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) DUMP(key string) ([]byte, error) {
+func (c *ConnDriver) DUMP(key string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "DUMP", key)
 	if e != nil {
 		return nil, e
@@ -99,7 +98,7 @@ func (c *Conn) DUMP(key string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) EXISTS(key string) (bool, error) {
+func (c *ConnDriver) EXISTS(key string) (bool, error) {
 	n, e := c.CallN(RetryTimes, "EXISTS", key)
 	if e != nil {
 		return false, e
@@ -116,7 +115,7 @@ func (c *Conn) EXISTS(key string) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) EXPIRE(key string, seconds int64) (bool, error) {
+func (c *ConnDriver) EXPIRE(key string, seconds int64) (bool, error) {
 	n, e := c.CallN(RetryTimes, "EXPIRE", key, seconds)
 	if e != nil {
 		return false, e
@@ -133,7 +132,7 @@ func (c *Conn) EXPIRE(key string, seconds int64) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) EXPIREAT(key string, timestamp int64) (bool, error) {
+func (c *ConnDriver) EXPIREAT(key string, timestamp int64) (bool, error) {
 	n, e := c.CallN(RetryTimes, "EXPIREAT", key, timestamp)
 	if e != nil {
 		return false, e
@@ -150,7 +149,7 @@ func (c *Conn) EXPIREAT(key string, timestamp int64) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) KEYS(pattern string) ([][]byte, error) {
+func (c *ConnDriver) KEYS(pattern string) ([][]byte, error) {
 	v, e := c.CallN(RetryTimes, "KEYS", pattern)
 	if e != nil {
 		return nil, e
@@ -167,7 +166,7 @@ func (c *Conn) KEYS(pattern string) ([][]byte, error) {
 }
 
 // since 2.6.0  COPY and REPLACE will be available in 3.0
-func (c *Conn) MIGRATE(host, port, key, destDB string, timeout int, COPY, REPLACE bool) (bool, error) {
+func (c *ConnDriver) MIGRATE(host, port, key, destDB string, timeout int, COPY, REPLACE bool) (bool, error) {
 	v, e := c.CallN(RetryTimes, "MIGRATE", host, port, key, destDB, timeout)
 	if e != nil {
 		return false, e
@@ -188,7 +187,7 @@ func (c *Conn) MIGRATE(host, port, key, destDB string, timeout int, COPY, REPLAC
 	return false, errors.New("migrate false")
 }
 
-func (c *Conn) SELECT(index int) ([]byte, error) {
+func (c *ConnDriver) SELECT(index int) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "SELECT", index)
 	if e != nil {
 		return nil, e
@@ -200,7 +199,7 @@ func (c *Conn) SELECT(index int) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) MOVE(key, db string) (bool, error) {
+func (c *ConnDriver) MOVE(key, db string) (bool, error) {
 	n, e := c.CallN(RetryTimes, "MOVE", key, db)
 	if e != nil {
 		return false, e
@@ -216,7 +215,7 @@ func (c *Conn) MOVE(key, db string) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) OBJECT(subcommand, key string) (interface{}, error) {
+func (c *ConnDriver) OBJECT(subcommand, key string) (interface{}, error) {
 	v, e := c.CallN(RetryTimes, "OBJECT", subcommand, key)
 	if e != nil {
 		return nil, e
@@ -237,7 +236,7 @@ func (c *Conn) OBJECT(subcommand, key string) (interface{}, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) PERSIST(key string) (bool, error) {
+func (c *ConnDriver) PERSIST(key string) (bool, error) {
 	n, e := c.CallN(RetryTimes, "PERSIST", key)
 	if e != nil {
 		return false, e
@@ -254,7 +253,7 @@ func (c *Conn) PERSIST(key string) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) PEXPIRE(key string, milliseconds int64) (bool, error) {
+func (c *ConnDriver) PEXPIRE(key string, milliseconds int64) (bool, error) {
 	n, e := c.CallN(RetryTimes, "EXPIRE", key, milliseconds)
 	if e != nil {
 		return false, e
@@ -271,7 +270,7 @@ func (c *Conn) PEXPIRE(key string, milliseconds int64) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) PEXPIREAT(key string, milliTimestamp int64) (bool, error) {
+func (c *ConnDriver) PEXPIREAT(key string, milliTimestamp int64) (bool, error) {
 	n, e := c.CallN(RetryTimes, "EXPIREAT", key, milliTimestamp)
 	if e != nil {
 		return false, e
@@ -288,7 +287,7 @@ func (c *Conn) PEXPIREAT(key string, milliTimestamp int64) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) PTTL(key string) (int64, error) {
+func (c *ConnDriver) PTTL(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "PTTL", key)
 	if e != nil {
 		return -1, e
@@ -301,7 +300,7 @@ func (c *Conn) PTTL(key string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) RANDOMKEY() ([]byte, error) {
+func (c *ConnDriver) RANDOMKEY() ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "RANDOMKEY")
 	if e != nil {
 		return nil, e
@@ -317,7 +316,7 @@ func (c *Conn) RANDOMKEY() ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) RENAME(key, newkey string) ([]byte, error) {
+func (c *ConnDriver) RENAME(key, newkey string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "RENAME", key, newkey)
 	if e != nil {
 		return nil, e
@@ -330,7 +329,7 @@ func (c *Conn) RENAME(key, newkey string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) RENAMENX(key, newkey string) (bool, error) {
+func (c *ConnDriver) RENAMENX(key, newkey string) (bool, error) {
 	n, e := c.CallN(RetryTimes, "RENAMENX", key, newkey)
 	if e != nil {
 		return false, e
@@ -348,7 +347,7 @@ func (c *Conn) RENAMENX(key, newkey string) (bool, error) {
 }
 
 // with dump
-func (c *Conn) RESTORE(key string, ttl int, serializedValue string) (bool, error) {
+func (c *ConnDriver) RESTORE(key string, ttl int, serializedValue string) (bool, error) {
 	v, e := c.CallN(RetryTimes, "RESTORE", key, ttl, serializedValue)
 	if e != nil {
 		return false, e
@@ -365,9 +364,9 @@ func (c *Conn) RESTORE(key string, ttl int, serializedValue string) (bool, error
 	return false, nil
 }
 
-func (c *Conn) SORT() {}
+func (c *ConnDriver) SORT() {}
 
-func (c *Conn) TTL(key string) (int64, error) {
+func (c *ConnDriver) TTL(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "TTL", key)
 	if e != nil {
 		return -1, e
@@ -375,7 +374,7 @@ func (c *Conn) TTL(key string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) TYPE(key string) ([]byte, error) {
+func (c *ConnDriver) TYPE(key string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "TYPE", key)
 	if e != nil {
 		return nil, e
@@ -388,7 +387,7 @@ func (c *Conn) TYPE(key string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) SCAN(cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+func (c *ConnDriver) SCAN(cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
 	args := make([]interface{}, 0, 5)
 	args = append(args, cursor)
 	if match {
@@ -412,8 +411,7 @@ func (c *Conn) SCAN(cursor int, match bool, pattern string, isCount bool, count 
 	return rCursor, r[1].([]interface{}), nil
 }
 
-/******************* sets commands *******************/
-func (c *Conn) SADD(key string, values []string) (int64, error) {
+func (c *ConnDriver) SADD(key string, values []string) (int64, error) {
 	args := make([]interface{}, len(values)+1)
 	args[0] = key
 	for i := 0; i < len(values); i++ {
@@ -431,7 +429,7 @@ func (c *Conn) SADD(key string, values []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) SREM(key string, values []string) (int64, error) {
+func (c *ConnDriver) SREM(key string, values []string) (int64, error) {
 	args := make([]interface{}, len(values)+1)
 	args[0] = key
 	for i := 0; i < len(values); i++ {
@@ -449,7 +447,7 @@ func (c *Conn) SREM(key string, values []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) SISMEMBER(key, value string) (int64, error) {
+func (c *ConnDriver) SISMEMBER(key, value string) (int64, error) {
 	v, e := c.CallN(RetryTimes, "SISMEMBER", key, value)
 	if e != nil {
 		return 0, e
@@ -462,7 +460,7 @@ func (c *Conn) SISMEMBER(key, value string) (int64, error) {
 	return v.(int64), nil
 }
 
-func (c *Conn) SMEMBERS(key string) ([][]byte, error) {
+func (c *ConnDriver) SMEMBERS(key string) ([][]byte, error) {
 	v, e := c.CallN(RetryTimes, "SMEMBERS", key)
 	if e != nil {
 		return nil, e
@@ -480,7 +478,7 @@ func (c *Conn) SMEMBERS(key string) ([][]byte, error) {
 }
 
 // 0说明key不存在
-func (c *Conn) SCARD(key string) (int64, error) {
+func (c *ConnDriver) SCARD(key string) (int64, error) {
 	v, e := c.CallN(RetryTimes, "SCARD", key)
 	if e != nil {
 		return 0, e
@@ -493,7 +491,7 @@ func (c *Conn) SCARD(key string) (int64, error) {
 	return v.(int64), nil
 }
 
-func (c *Conn) SINTER(keys []string) ([][]byte, error) {
+func (c *ConnDriver) SINTER(keys []string) ([][]byte, error) {
 	args := make([]interface{}, len(keys))
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
@@ -514,7 +512,7 @@ func (c *Conn) SINTER(keys []string) ([][]byte, error) {
 	return members, nil
 }
 
-func (c *Conn) SINTERSTORE(key string, keys []string) (int64, error) {
+func (c *ConnDriver) SINTERSTORE(key string, keys []string) (int64, error) {
 	args := make([]interface{}, len(keys)+1)
 	args[0] = key
 	for i := 0; i < len(keys); i++ {
@@ -532,7 +530,7 @@ func (c *Conn) SINTERSTORE(key string, keys []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) SDIFF(keys []string) ([][]byte, error) {
+func (c *ConnDriver) SDIFF(keys []string) ([][]byte, error) {
 	args := make([]interface{}, len(keys))
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
@@ -553,7 +551,7 @@ func (c *Conn) SDIFF(keys []string) ([][]byte, error) {
 	return members, nil
 }
 
-func (c *Conn) SDIFFSTORE(key string, keys []string) (int64, error) {
+func (c *ConnDriver) SDIFFSTORE(key string, keys []string) (int64, error) {
 	args := make([]interface{}, len(keys)+1)
 	args[0] = key
 	for i := 0; i < len(keys); i++ {
@@ -572,7 +570,7 @@ func (c *Conn) SDIFFSTORE(key string, keys []string) (int64, error) {
 }
 
 // TODO:return bool
-func (c *Conn) SMOVE(srcKey, desKey, member string) (int64, error) {
+func (c *ConnDriver) SMOVE(srcKey, desKey, member string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "SMOVE", srcKey, desKey, member)
 	if e != nil {
 		return -1, e
@@ -585,7 +583,7 @@ func (c *Conn) SMOVE(srcKey, desKey, member string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) SPOP(key string) ([]byte, error) {
+func (c *ConnDriver) SPOP(key string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "SPOP", key)
 	if e != nil {
 		return nil, e
@@ -601,7 +599,7 @@ func (c *Conn) SPOP(key string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) SRANDMEMBER(key string, count int) ([][]byte, error) {
+func (c *ConnDriver) SRANDMEMBER(key string, count int) ([][]byte, error) {
 	if count == 0 {
 		v, e := c.CallN(RetryTimes, "SRANDMEMBER", key)
 		if e != nil {
@@ -631,7 +629,7 @@ func (c *Conn) SRANDMEMBER(key string, count int) ([][]byte, error) {
 	return members, nil
 }
 
-func (c *Conn) SUNION(keys []string) ([][]byte, error) {
+func (c *ConnDriver) SUNION(keys []string) ([][]byte, error) {
 	args := make([]interface{}, len(keys))
 	for i := 0; i < len(keys); i++ {
 		args[i] = keys[i]
@@ -651,7 +649,7 @@ func (c *Conn) SUNION(keys []string) ([][]byte, error) {
 	return members, nil
 }
 
-func (c *Conn) SUNIONSTORE(key string, keys []string) (int64, error) {
+func (c *ConnDriver) SUNIONSTORE(key string, keys []string) (int64, error) {
 	args := make([]interface{}, len(keys)+1)
 	args[0] = key
 	for i := 0; i < len(keys); i++ {
@@ -670,7 +668,7 @@ func (c *Conn) SUNIONSTORE(key string, keys []string) (int64, error) {
 }
 
 /******************* strings commands *******************/
-func (c *Conn) APPEND(key, value string) (int64, error) {
+func (c *ConnDriver) APPEND(key, value string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "APPEND", key, value)
 	if e != nil {
 		return -1, e
@@ -683,7 +681,7 @@ func (c *Conn) APPEND(key, value string) (int64, error) {
 	return n.(int64), e
 }
 
-func (c *Conn) BITCOUNT(key string) (int64, error) {
+func (c *ConnDriver) BITCOUNT(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "BITCOUNT", key)
 	if e != nil {
 		return -1, e
@@ -697,7 +695,7 @@ func (c *Conn) BITCOUNT(key string) (int64, error) {
 }
 
 // 2.6.0
-func (c *Conn) BITOP(op, dest string, keys []string) (int64, error) {
+func (c *ConnDriver) BITOP(op, dest string, keys []string) (int64, error) {
 	args := make([]interface{}, len(keys)+2)
 	args[0] = op
 	args[1] = dest
@@ -717,9 +715,9 @@ func (c *Conn) BITOP(op, dest string, keys []string) (int64, error) {
 }
 
 // 2.8.7 TODO
-func (c *Conn) BITPOS() {}
+func (c *ConnDriver) BITPOS() {}
 
-func (c *Conn) DECR(key string) (int64, error) {
+func (c *ConnDriver) DECR(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "DECR", key)
 	if e != nil {
 		return -1, e
@@ -732,7 +730,7 @@ func (c *Conn) DECR(key string) (int64, error) {
 	return n.(int64), e
 }
 
-func (c *Conn) DECRBY(key string, num int) (int64, error) {
+func (c *ConnDriver) DECRBY(key string, num int) (int64, error) {
 	n, e := c.CallN(RetryTimes, "DECRBY", key, num)
 	if e != nil {
 		return -1, e
@@ -745,7 +743,7 @@ func (c *Conn) DECRBY(key string, num int) (int64, error) {
 	return n.(int64), e
 }
 
-func (c *Conn) INCR(key string) (int64, error) {
+func (c *ConnDriver) INCR(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "INCR", key)
 	if e != nil {
 		return -1, e
@@ -758,7 +756,7 @@ func (c *Conn) INCR(key string) (int64, error) {
 	return n.(int64), e
 }
 
-func (c *Conn) INCRBY(key string, num int) (int64, error) {
+func (c *ConnDriver) INCRBY(key string, num int) (int64, error) {
 	n, e := c.CallN(RetryTimes, "INCRBY", key, num)
 	if e != nil {
 		return -1, e
@@ -771,7 +769,7 @@ func (c *Conn) INCRBY(key string, num int) (int64, error) {
 	return n.(int64), e
 }
 
-func (c *Conn) INCRBYFLOAT(key string, f float64) ([]byte, error) {
+func (c *ConnDriver) INCRBYFLOAT(key string, f float64) ([]byte, error) {
 	n, e := c.CallN(RetryTimes, "INCRBYFLOAT", key, f)
 	if e != nil {
 		return nil, e
@@ -784,7 +782,7 @@ func (c *Conn) INCRBYFLOAT(key string, f float64) ([]byte, error) {
 	return n.([]byte), e
 }
 
-func (c *Conn) SET(key, value string) ([]byte, error) {
+func (c *ConnDriver) SET(key, value string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "SET", key, value)
 	if e != nil {
 		return nil, e
@@ -798,7 +796,7 @@ func (c *Conn) SET(key, value string) ([]byte, error) {
 }
 
 // 应该返回interface还是[]byte?
-func (c *Conn) GET(key string) ([]byte, error) {
+func (c *ConnDriver) GET(key string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "GET", key)
 	if e != nil {
 		return nil, e
@@ -814,7 +812,7 @@ func (c *Conn) GET(key string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) GETBIT(key string, pos int) (int64, error) {
+func (c *ConnDriver) GETBIT(key string, pos int) (int64, error) {
 	n, e := c.CallN(RetryTimes, "GETBIT", key, pos)
 	if e != nil {
 		return -1, e
@@ -827,7 +825,7 @@ func (c *Conn) GETBIT(key string, pos int) (int64, error) {
 	return n.(int64), e
 }
 
-func (c *Conn) GETRANGE(key string, start, end int) ([]byte, error) {
+func (c *ConnDriver) GETRANGE(key string, start, end int) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "GETRANGE", key, start, end)
 	if e != nil {
 		return nil, e
@@ -840,7 +838,7 @@ func (c *Conn) GETRANGE(key string, start, end int) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) GETSET(key, value string) ([]byte, error) {
+func (c *ConnDriver) GETSET(key, value string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "GETSET", key, value)
 	if e != nil {
 		return nil, e
@@ -857,7 +855,7 @@ func (c *Conn) GETSET(key, value string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) MGET(keys []string) ([]interface{}, error) {
+func (c *ConnDriver) MGET(keys []string) ([]interface{}, error) {
 	args := make([]interface{}, len(keys))
 	for k, v := range keys {
 		args[k] = v
@@ -874,7 +872,7 @@ func (c *Conn) MGET(keys []string) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) MSET(kv map[string]string) ([]byte, error) {
+func (c *ConnDriver) MSET(kv map[string]string) ([]byte, error) {
 	args := make([]interface{}, 2*len(kv))
 	i := 0
 	for k, v := range kv {
@@ -894,7 +892,7 @@ func (c *Conn) MSET(kv map[string]string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) MSETNX(kv map[string]string) (int64, error) {
+func (c *ConnDriver) MSETNX(kv map[string]string) (int64, error) {
 	args := make([]interface{}, 2*len(kv))
 	i := 0
 	for k, v := range kv {
@@ -914,7 +912,7 @@ func (c *Conn) MSETNX(kv map[string]string) (int64, error) {
 	return v.(int64), e
 }
 
-func (c *Conn) PSETEX(key string, millonseconds int64, value string) ([]byte, error) {
+func (c *ConnDriver) PSETEX(key string, millonseconds int64, value string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "PSETEX", key, millonseconds, value)
 	if e != nil {
 		return nil, e
@@ -927,7 +925,7 @@ func (c *Conn) PSETEX(key string, millonseconds int64, value string) ([]byte, er
 	return v.([]byte), nil
 }
 
-func (c *Conn) SETBIT(key string, pos, value int) (int64, error) {
+func (c *ConnDriver) SETBIT(key string, pos, value int) (int64, error) {
 	n, e := c.CallN(RetryTimes, "SETBIT", key, pos, value)
 	if e != nil {
 		return -1, e
@@ -940,7 +938,7 @@ func (c *Conn) SETBIT(key string, pos, value int) (int64, error) {
 	return n.(int64), e
 }
 
-func (c *Conn) SETEX(key string, seconds int64, value string) ([]byte, error) {
+func (c *ConnDriver) SETEX(key string, seconds int64, value string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "SETEX", key, seconds, value)
 	if e != nil {
 		return nil, e
@@ -953,7 +951,7 @@ func (c *Conn) SETEX(key string, seconds int64, value string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) SETNX(key, value string) (int64, error) {
+func (c *ConnDriver) SETNX(key, value string) (int64, error) {
 	v, e := c.CallN(RetryTimes, "SETNX", key, value)
 	if e != nil {
 		return -1, e
@@ -966,7 +964,7 @@ func (c *Conn) SETNX(key, value string) (int64, error) {
 	return v.(int64), e
 }
 
-func (c *Conn) SETRANGE(key string, offset int, value string) (int64, error) {
+func (c *ConnDriver) SETRANGE(key string, offset int, value string) (int64, error) {
 	v, e := c.CallN(RetryTimes, "SETRANGE", key, offset, value)
 	if e != nil {
 		return -1, e
@@ -979,7 +977,7 @@ func (c *Conn) SETRANGE(key string, offset int, value string) (int64, error) {
 	return v.(int64), e
 }
 
-func (c *Conn) STRLEN(key string) (int64, error) {
+func (c *ConnDriver) STRLEN(key string) (int64, error) {
 	v, e := c.CallN(RetryTimes, "STRLEN", key)
 	if e != nil {
 		return -1, e
@@ -992,7 +990,7 @@ func (c *Conn) STRLEN(key string) (int64, error) {
 	return v.(int64), e
 }
 
-func (c *Conn) SSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+func (c *ConnDriver) SSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
 	args := make([]interface{}, 0, 6)
 	args = append(args, key, cursor)
 	if match {
@@ -1016,8 +1014,7 @@ func (c *Conn) SSCAN(key string, cursor int, match bool, pattern string, isCount
 	return rCursor, r[1].([]interface{}), nil
 }
 
-/******************* hashes commands *******************/
-func (c *Conn) HDEL(key string, fields []string) (int64, error) {
+func (c *ConnDriver) HDEL(key string, fields []string) (int64, error) {
 	args := make([]interface{}, len(fields)+1)
 	args[0] = key
 	for i := 0; i < len(fields); i++ {
@@ -1035,7 +1032,7 @@ func (c *Conn) HDEL(key string, fields []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) HEXISTS(key string, field string) (bool, error) {
+func (c *ConnDriver) HEXISTS(key string, field string) (bool, error) {
 	n, e := c.CallN(RetryTimes, "HEXISTS", key, field)
 	if e != nil {
 		return false, e
@@ -1052,7 +1049,7 @@ func (c *Conn) HEXISTS(key string, field string) (bool, error) {
 	return false, nil
 }
 
-func (c *Conn) HGET(key string, field string) ([]byte, error) {
+func (c *ConnDriver) HGET(key string, field string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "HGET", key, field)
 	if e != nil {
 		return nil, e
@@ -1068,7 +1065,7 @@ func (c *Conn) HGET(key string, field string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) HGETALL(key string) ([]interface{}, error) {
+func (c *ConnDriver) HGETALL(key string) ([]interface{}, error) {
 	v, e := c.CallN(RetryTimes, "HGETALL", key)
 	if e != nil {
 		return nil, e
@@ -1086,7 +1083,7 @@ func (c *Conn) HGETALL(key string) ([]interface{}, error) {
 }
 
 // 返回结果用map组织
-func (c *Conn) HGETALLMAP(key string) (map[string]string, error) {
+func (c *ConnDriver) HGETALLMAP(key string) (map[string]string, error) {
 	v, e := c.HGETALL(key)
 	if e != nil {
 		return nil, e
@@ -1105,7 +1102,7 @@ func (c *Conn) HGETALLMAP(key string) (map[string]string, error) {
 	return result, nil
 }
 
-func (c *Conn) HINCRBY(key string, field string, increment int) (int64, error) {
+func (c *ConnDriver) HINCRBY(key string, field string, increment int) (int64, error) {
 	n, e := c.CallN(RetryTimes, "HINCRBY", key, field, increment)
 	if e != nil {
 		return -1, e
@@ -1118,7 +1115,7 @@ func (c *Conn) HINCRBY(key string, field string, increment int) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) HINCRBYFLOAT(key string, field string, increment float64) ([]byte, error) {
+func (c *ConnDriver) HINCRBYFLOAT(key string, field string, increment float64) ([]byte, error) {
 	n, e := c.CallN(RetryTimes, "HINCRBYFLOAT", key, field, increment)
 	if e != nil {
 		return nil, e
@@ -1131,7 +1128,7 @@ func (c *Conn) HINCRBYFLOAT(key string, field string, increment float64) ([]byte
 	return n.([]byte), nil
 }
 
-func (c *Conn) HKEYS(key string) ([][]byte, error) {
+func (c *ConnDriver) HKEYS(key string) ([][]byte, error) {
 	v, e := c.CallN(RetryTimes, "HKEYS", key)
 	if e != nil {
 		return nil, e
@@ -1151,7 +1148,7 @@ func (c *Conn) HKEYS(key string) ([][]byte, error) {
 	return members, nil
 }
 
-func (c *Conn) HLEN(key string) (int64, error) {
+func (c *ConnDriver) HLEN(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "HLEN", key)
 	if e != nil {
 		return -1, e
@@ -1164,7 +1161,7 @@ func (c *Conn) HLEN(key string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) HMGET(key string, fields []string) ([]interface{}, error) {
+func (c *ConnDriver) HMGET(key string, fields []string) ([]interface{}, error) {
 	args := make([]interface{}, len(fields)+1)
 	args[0] = key
 	for i := 0; i < len(fields); i++ {
@@ -1186,7 +1183,7 @@ func (c *Conn) HMGET(key string, fields []string) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) HMSET(key string, kv map[string]interface{}) ([]byte, error) {
+func (c *ConnDriver) HMSET(key string, kv map[string]interface{}) ([]byte, error) {
 	args := make([]interface{}, 2*len(kv)+1)
 	args[0] = key
 	i := 1
@@ -1207,7 +1204,7 @@ func (c *Conn) HMSET(key string, kv map[string]interface{}) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) HSET(key, field string, value interface{}) (int64, error) {
+func (c *ConnDriver) HSET(key, field string, value interface{}) (int64, error) {
 	n, e := c.CallN(RetryTimes, "HSET", key, field, value)
 	if e != nil {
 		return -1, e
@@ -1220,7 +1217,7 @@ func (c *Conn) HSET(key, field string, value interface{}) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) HSETNX(key, field string, value interface{}) (int64, error) {
+func (c *ConnDriver) HSETNX(key, field string, value interface{}) (int64, error) {
 	n, e := c.CallN(RetryTimes, "HSETNX", key, field, value)
 	if e != nil {
 		return -1, e
@@ -1233,7 +1230,7 @@ func (c *Conn) HSETNX(key, field string, value interface{}) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) HVALS(key string) ([]interface{}, error) {
+func (c *ConnDriver) HVALS(key string) ([]interface{}, error) {
 	v, e := c.CallN(RetryTimes, "HVALS", key)
 	if e != nil {
 		return nil, e
@@ -1246,7 +1243,7 @@ func (c *Conn) HVALS(key string) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) HSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+func (c *ConnDriver) HSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
 	args := make([]interface{}, 0, 6)
 	args = append(args, key, cursor)
 	if match {
@@ -1270,8 +1267,7 @@ func (c *Conn) HSCAN(key string, cursor int, match bool, pattern string, isCount
 	return rCursor, r[1].([]interface{}), nil
 }
 
-/******************* lists commands *******************/
-func (c *Conn) BLPOP(keys []string, timeout int) ([]interface{}, error) {
+func (c *ConnDriver) BLPOP(keys []string, timeout int) ([]interface{}, error) {
 	args := make([]interface{}, len(keys)+1)
 	for k, v := range keys {
 		args[k] = v
@@ -1293,7 +1289,7 @@ func (c *Conn) BLPOP(keys []string, timeout int) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) BRPOP(keys []string, timeout int) ([]interface{}, error) {
+func (c *ConnDriver) BRPOP(keys []string, timeout int) ([]interface{}, error) {
 	args := make([]interface{}, len(keys)+1)
 	for k, v := range keys {
 		args[k] = v
@@ -1315,7 +1311,7 @@ func (c *Conn) BRPOP(keys []string, timeout int) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) BRPOPLPUSH(source, dest string, timeout int) ([]byte, error) {
+func (c *ConnDriver) BRPOPLPUSH(source, dest string, timeout int) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "BRPOPLPUSH", source, dest, timeout)
 	if e != nil {
 		return nil, e
@@ -1331,7 +1327,7 @@ func (c *Conn) BRPOPLPUSH(source, dest string, timeout int) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) LINDEX(key string, index int) ([]byte, error) {
+func (c *ConnDriver) LINDEX(key string, index int) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "LINDEX", key, index)
 	if e != nil {
 		return nil, e
@@ -1347,7 +1343,7 @@ func (c *Conn) LINDEX(key string, index int) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) LINSERT(key, dir, pivot, value string) (int64, error) {
+func (c *ConnDriver) LINSERT(key, dir, pivot, value string) (int64, error) {
 	if strings.ToLower(dir) != "before" && strings.ToLower(dir) != "after" {
 		return -1, errors.New(CommonErrPrefix + "dir only can be (before or after)")
 	}
@@ -1363,7 +1359,7 @@ func (c *Conn) LINSERT(key, dir, pivot, value string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) LLEN(key string) (int64, error) {
+func (c *ConnDriver) LLEN(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "LLEN", key)
 	if e != nil {
 		return -1, e
@@ -1376,7 +1372,7 @@ func (c *Conn) LLEN(key string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) LPOP(key string) ([]byte, error) {
+func (c *ConnDriver) LPOP(key string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "LPOP", key)
 	if e != nil {
 		return nil, e
@@ -1392,7 +1388,7 @@ func (c *Conn) LPOP(key string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) LPUSH(key string, values []string) (int64, error) {
+func (c *ConnDriver) LPUSH(key string, values []string) (int64, error) {
 	args := make([]interface{}, len(values)+1)
 	args[0] = key
 	for i, v := range values {
@@ -1410,7 +1406,7 @@ func (c *Conn) LPUSH(key string, values []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) LPUSHX(key, value string) (int64, error) {
+func (c *ConnDriver) LPUSHX(key, value string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "LPUSHX", key, value)
 	if e != nil {
 		return -1, e
@@ -1423,7 +1419,7 @@ func (c *Conn) LPUSHX(key, value string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) LRANGE(key string, start, end int) ([]interface{}, error) {
+func (c *ConnDriver) LRANGE(key string, start, end int) ([]interface{}, error) {
 	v, e := c.CallN(RetryTimes, "LRANGE", key, start, end)
 	if e != nil {
 		return nil, e
@@ -1436,7 +1432,7 @@ func (c *Conn) LRANGE(key string, start, end int) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) LREM(key string, count int, value string) (int64, error) {
+func (c *ConnDriver) LREM(key string, count int, value string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "LREM", key, count, value)
 	if e != nil {
 		return -1, e
@@ -1449,7 +1445,7 @@ func (c *Conn) LREM(key string, count int, value string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) LSET(key string, index int, value string) ([]byte, error) {
+func (c *ConnDriver) LSET(key string, index int, value string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "LSET", key, index, value)
 	if e != nil {
 		return nil, e
@@ -1462,7 +1458,7 @@ func (c *Conn) LSET(key string, index int, value string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) LTRIM(key string, start, end int) ([]byte, error) {
+func (c *ConnDriver) LTRIM(key string, start, end int) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "LTRIM", key, start, end)
 	if e != nil {
 		return nil, e
@@ -1475,7 +1471,7 @@ func (c *Conn) LTRIM(key string, start, end int) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) RPOP(key string) ([]byte, error) {
+func (c *ConnDriver) RPOP(key string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "RPOP", key)
 	if e != nil {
 		return nil, e
@@ -1491,7 +1487,7 @@ func (c *Conn) RPOP(key string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) RPOPLPUSH(source, dest string) ([]byte, error) {
+func (c *ConnDriver) RPOPLPUSH(source, dest string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "RPOPLPUSH", source, dest)
 	if e != nil {
 		return nil, e
@@ -1507,7 +1503,7 @@ func (c *Conn) RPOPLPUSH(source, dest string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) RPUSH(key string, values []string) (int64, error) {
+func (c *ConnDriver) RPUSH(key string, values []string) (int64, error) {
 	args := make([]interface{}, len(values)+1)
 	args[0] = key
 	for i, v := range values {
@@ -1525,7 +1521,7 @@ func (c *Conn) RPUSH(key string, values []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) RPUSHX(key, value string) (int64, error) {
+func (c *ConnDriver) RPUSHX(key, value string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "RPUSHX", key, value)
 	if e != nil {
 		return -1, e
@@ -1538,8 +1534,7 @@ func (c *Conn) RPUSHX(key, value string) (int64, error) {
 	return n.(int64), nil
 }
 
-/******************* sorted sets commands *******************/
-func (c *Conn) ZADDSpec(key string, score, value string) (int64, error) {
+func (c *ConnDriver) ZADDSpec(key string, score, value string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZADD", key, score, value)
 	if e != nil {
 		return -1, e
@@ -1552,7 +1547,7 @@ func (c *Conn) ZADDSpec(key string, score, value string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) {
+func (c *ConnDriver) ZADD(key string, keyScore map[string]interface{}) (int64, error) {
 	args := make([]interface{}, 1+2*len(keyScore))
 	args[0] = key
 	i := 1
@@ -1573,7 +1568,7 @@ func (c *Conn) ZADD(key string, keyScore map[string]interface{}) (int64, error) 
 	return n.(int64), nil
 }
 
-func (c *Conn) ZCARD(key string) (int64, error) {
+func (c *ConnDriver) ZCARD(key string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZCARD", key)
 	if e != nil {
 		return -1, e
@@ -1586,7 +1581,7 @@ func (c *Conn) ZCARD(key string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) ZCOUNT(key string, min, max float64) (int64, error) {
+func (c *ConnDriver) ZCOUNT(key string, min, max float64) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZCOUNT", key, min, max)
 	if e != nil {
 		return -1, e
@@ -1600,7 +1595,7 @@ func (c *Conn) ZCOUNT(key string, min, max float64) (int64, error) {
 }
 
 // increment could be int, float ,string
-func (c *Conn) ZINCRBY(key string, increment interface{}, member string) ([]byte, error) {
+func (c *ConnDriver) ZINCRBY(key string, increment interface{}, member string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "ZINCRBY", key, increment, member)
 	if e != nil {
 		return nil, e
@@ -1613,7 +1608,7 @@ func (c *Conn) ZINCRBY(key string, increment interface{}, member string) ([]byte
 	return v.([]byte), nil
 }
 
-func (c *Conn) ZINTERSTORE(destination string, numkeys int, keys []string, weights bool, ws []int, aggregate bool, ag string) (int64, error) {
+func (c *ConnDriver) ZINTERSTORE(destination string, numkeys int, keys []string, weights bool, ws []int, aggregate bool, ag string) (int64, error) {
 	args := make([]interface{}, 2+numkeys)
 	args[0] = destination
 	args[1] = numkeys
@@ -1649,7 +1644,7 @@ func (c *Conn) ZINTERSTORE(destination string, numkeys int, keys []string, weigh
 }
 
 // since 2.8.9
-// func (c *Conn) ZLEXCOUNT(key, min, max string) (int64, error) {
+// func (c *ConnDriver) ZLEXCOUNT(key, min, max string) (int64, error) {
 // 	n, e := c.CallN(RetryTimes,"ZLEXCOUNT", key, min, max)
 // 	if e != nil {
 // 		return -1, e
@@ -1657,7 +1652,7 @@ func (c *Conn) ZINTERSTORE(destination string, numkeys int, keys []string, weigh
 // 	return n.(int64), nil
 // }
 
-func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
+func (c *ConnDriver) ZRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
 	if withscores == true {
 		v, e := c.CallN(RetryTimes, "ZRANGE", key, start, stop, "WITHSCORES")
 		if e != nil {
@@ -1678,7 +1673,7 @@ func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface
 }
 
 // since 2.8.9
-// func (c *Conn) ZRANGEBYLEX(key, min, max string, limit bool, offset, count int) ([]interface{}, error) {
+// func (c *ConnDriver) ZRANGEBYLEX(key, min, max string, limit bool, offset, count int) ([]interface{}, error) {
 // 	args := make([]interface{}, 3)
 // 	args[0] = key
 // 	args[1] = min
@@ -1694,7 +1689,7 @@ func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface
 // }
 
 // 2.8.9
-// func (c *Conn) ZREVRANGEBYLEX(key, max, min string, limit bool, offset, count int) ([]interface{}, error) {
+// func (c *ConnDriver) ZREVRANGEBYLEX(key, max, min string, limit bool, offset, count int) ([]interface{}, error) {
 // 	args := make([]interface{}, 3)
 // 	args[0] = key
 // 	args[1] = max
@@ -1709,7 +1704,7 @@ func (c *Conn) ZRANGE(key string, start, stop int, withscores bool) ([]interface
 // 	return v.([]interface{}), nil
 // }
 
-func (c *Conn) ZRANGEBYSCORE(key string, min, max interface{}, withScores, limit bool, offset, count interface{}) ([]interface{}, error) {
+func (c *ConnDriver) ZRANGEBYSCORE(key string, min, max interface{}, withScores, limit bool, offset, count interface{}) ([]interface{}, error) {
 	args := make([]interface{}, 3)
 	args[0] = key
 	args[1] = min
@@ -1733,7 +1728,7 @@ func (c *Conn) ZRANGEBYSCORE(key string, min, max interface{}, withScores, limit
 }
 
 // if key,or member not exists return bulk string nil, else return integer
-func (c *Conn) ZRANK(key, member string) (int64, error) {
+func (c *ConnDriver) ZRANK(key, member string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZRANK", key, member)
 	if e != nil {
 		return -1, e
@@ -1745,7 +1740,7 @@ func (c *Conn) ZRANK(key, member string) (int64, error) {
 	return -1, ErrKeyNotExist
 }
 
-func (c *Conn) ZREM(key string, members []string) (int64, error) {
+func (c *ConnDriver) ZREM(key string, members []string) (int64, error) {
 	args := make([]interface{}, 1+len(members))
 	args[0] = key
 	i := 1
@@ -1766,7 +1761,7 @@ func (c *Conn) ZREM(key string, members []string) (int64, error) {
 }
 
 // since 2.8.9
-// func (c *Conn) ZREMRANGEBYLEX(key, min, max string) (int64, error) {
+// func (c *ConnDriver) ZREMRANGEBYLEX(key, min, max string) (int64, error) {
 // 	n, e := c.CallN(RetryTimes,"ZREMRANGEBYLEX", key, min, max)
 // 	if e != nil {
 // 		return -1, e
@@ -1774,7 +1769,7 @@ func (c *Conn) ZREM(key string, members []string) (int64, error) {
 // 	return n.(int64), nil
 // }
 
-func (c *Conn) ZREMRANGEBYRANK(key string, min, max interface{}) (int64, error) {
+func (c *ConnDriver) ZREMRANGEBYRANK(key string, min, max interface{}) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZREMRANGEBYRANK", key, min, max)
 	if e != nil {
 		return -1, e
@@ -1787,7 +1782,7 @@ func (c *Conn) ZREMRANGEBYRANK(key string, min, max interface{}) (int64, error) 
 	return n.(int64), nil
 }
 
-func (c *Conn) ZREMRANGEBYSCORE(key string, min, max interface{}) (int64, error) {
+func (c *ConnDriver) ZREMRANGEBYSCORE(key string, min, max interface{}) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZREMRANGEBYSCORE", key, min, max)
 	if e != nil {
 		return -1, e
@@ -1800,7 +1795,7 @@ func (c *Conn) ZREMRANGEBYSCORE(key string, min, max interface{}) (int64, error)
 	return n.(int64), nil
 }
 
-func (c *Conn) ZREVRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
+func (c *ConnDriver) ZREVRANGE(key string, start, stop int, withscores bool) ([]interface{}, error) {
 	if withscores == true {
 		v, e := c.CallN(RetryTimes, "ZREVRANGE", key, start, stop, "WITHSCORES")
 		if e != nil {
@@ -1819,7 +1814,7 @@ func (c *Conn) ZREVRANGE(key string, start, stop int, withscores bool) ([]interf
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) ZREVRANGEBYSCORE(key string, max, min interface{}, withScores, limit bool, offset, count interface{}) ([]interface{}, error) {
+func (c *ConnDriver) ZREVRANGEBYSCORE(key string, max, min interface{}, withScores, limit bool, offset, count interface{}) ([]interface{}, error) {
 	args := make([]interface{}, 3)
 	args[0] = key
 	args[1] = max
@@ -1841,7 +1836,7 @@ func (c *Conn) ZREVRANGEBYSCORE(key string, max, min interface{}, withScores, li
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) ZREVRANK(key, member string) (int64, error) {
+func (c *ConnDriver) ZREVRANK(key, member string) (int64, error) {
 	n, e := c.CallN(RetryTimes, "ZREVRANK", key, member)
 	if e != nil {
 		return -1, e
@@ -1853,7 +1848,7 @@ func (c *Conn) ZREVRANK(key, member string) (int64, error) {
 	return -1, ErrKeyNotExist
 }
 
-func (c *Conn) ZSCORE(key, member string) ([]byte, error) {
+func (c *ConnDriver) ZSCORE(key, member string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "ZSCORE", key, member)
 	if e != nil {
 		return nil, e
@@ -1869,7 +1864,7 @@ func (c *Conn) ZSCORE(key, member string) ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) ZUNIONSTORE(destination string, numkeys int, keys []string, weights bool, ws []int, aggregate bool, ag string) (int64, error) {
+func (c *ConnDriver) ZUNIONSTORE(destination string, numkeys int, keys []string, weights bool, ws []int, aggregate bool, ag string) (int64, error) {
 	args := make([]interface{}, 2+numkeys)
 	args[0] = destination
 	args[1] = numkeys
@@ -1904,7 +1899,7 @@ func (c *Conn) ZUNIONSTORE(destination string, numkeys int, keys []string, weigh
 	return n.(int64), nil
 }
 
-func (c *Conn) ZSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
+func (c *ConnDriver) ZSCAN(key string, cursor int, match bool, pattern string, isCount bool, count int) (int, []interface{}, error) {
 	args := make([]interface{}, 0, 6)
 	args = append(args, key, cursor)
 	if match {
@@ -1928,9 +1923,8 @@ func (c *Conn) ZSCAN(key string, cursor int, match bool, pattern string, isCount
 	return rCursor, r[1].([]interface{}), nil
 }
 
-/******************* hyperLogLog *******************/
 // since 2.8.9
-func (c *Conn) PFADD(key string, elements []string) (int64, error) {
+func (c *ConnDriver) PFADD(key string, elements []string) (int64, error) {
 	args := make([]interface{}, 1+len(elements))
 	args[0] = key
 	i := 1
@@ -1950,7 +1944,7 @@ func (c *Conn) PFADD(key string, elements []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) PFCOUNT(keys []string) (int64, error) {
+func (c *ConnDriver) PFCOUNT(keys []string) (int64, error) {
 	args := make([]interface{}, len(keys))
 	i := 0
 	for _, key := range keys {
@@ -1969,7 +1963,7 @@ func (c *Conn) PFCOUNT(keys []string) (int64, error) {
 	return n.(int64), nil
 }
 
-func (c *Conn) PFMERGE(destKey string, sourceKeys []string) ([]byte, error) {
+func (c *ConnDriver) PFMERGE(destKey string, sourceKeys []string) ([]byte, error) {
 	args := make([]interface{}, 1+len(sourceKeys))
 	args[0] = destKey
 	i := 1
@@ -1990,7 +1984,7 @@ func (c *Conn) PFMERGE(destKey string, sourceKeys []string) ([]byte, error) {
 }
 
 /******************* scripting *******************/
-func (c *Conn) EVAL(script string, numkeys int, keys []string, scriptArgs []string) (interface{}, error) {
+func (c *ConnDriver) EVAL(script string, numkeys int, keys []string, scriptArgs []string) (interface{}, error) {
 	args := make([]interface{}, 2+numkeys+len(scriptArgs))
 	args[0] = script
 	args[1] = numkeys
@@ -2011,7 +2005,7 @@ func (c *Conn) EVAL(script string, numkeys int, keys []string, scriptArgs []stri
 	return v, nil
 }
 
-func (c *Conn) EVALSHA(sha1 string, numkeys int, keys []string, scriptArgs []string) (interface{}, error) {
+func (c *ConnDriver) EVALSHA(sha1 string, numkeys int, keys []string, scriptArgs []string) (interface{}, error) {
 	args := make([]interface{}, 2+numkeys+len(scriptArgs))
 	args[0] = sha1
 	args[1] = numkeys
@@ -2032,7 +2026,7 @@ func (c *Conn) EVALSHA(sha1 string, numkeys int, keys []string, scriptArgs []str
 	return v, nil
 }
 
-func (c *Conn) SCRIPTEXISTS(scripts []string) ([]interface{}, error) {
+func (c *ConnDriver) SCRIPTEXISTS(scripts []string) ([]interface{}, error) {
 	args := make([]interface{}, 1+len(scripts))
 	args[0] = "EXISTS"
 	i := 1
@@ -2052,7 +2046,7 @@ func (c *Conn) SCRIPTEXISTS(scripts []string) ([]interface{}, error) {
 	return v.([]interface{}), nil
 }
 
-func (c *Conn) SCRIPTFLUSH() ([]byte, error) {
+func (c *ConnDriver) SCRIPTFLUSH() ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "SCRIPT", "FLUSH")
 	if e != nil {
 		return nil, e
@@ -2065,7 +2059,7 @@ func (c *Conn) SCRIPTFLUSH() ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) SCRIPTKILL() ([]byte, error) {
+func (c *ConnDriver) SCRIPTKILL() ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "SCRIPT", "KILL")
 	if e != nil {
 		return nil, e
@@ -2078,7 +2072,7 @@ func (c *Conn) SCRIPTKILL() ([]byte, error) {
 	return v.([]byte), nil
 }
 
-func (c *Conn) SCRIPTLOAD(script string) ([]byte, error) {
+func (c *ConnDriver) SCRIPTLOAD(script string) ([]byte, error) {
 	v, e := c.CallN(RetryTimes, "SCRIPT", "LOAD", script)
 	if e != nil {
 		return nil, e
